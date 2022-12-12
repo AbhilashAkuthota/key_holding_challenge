@@ -1,0 +1,36 @@
+version: 0.2
+phases:
+  install:
+    commands:
+      - nohup /usr/local/bin/dockerd --host=unix:///var/run/docker.sock --host=tcp://127.0.0.1:2375 --storage-driver=overlay2&
+      - timeout 15 sh -c "until docker info; do echo .; sleep 1; done"
+  pre_build:
+    commands:
+    - echo Logging in to Amazon ECR....
+    - aws --version
+    - $(aws ecr get-login --no-include-email --region eu-west-1)
+    - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+    - IMAGE_TAG=${COMMIT_HASH:=latest}
+    - PLATFORM_REPOSITORY_URI=$REPO_URL # Repository url to pull the image
+    - pip install -r requirements.txt
+    - pytest # running the tests before building
+  build:
+    commands:
+    - echo Build started on `date`
+    - echo Building the Docker image for platform...
+    - docker-compose build
+    - docker tag key_holding_platform $PLATFORM_REPOSITORY_URI:$IMAGE_TAG
+    - docker tag key_holding_platform $PLATFORM_REPOSITORY_URI:latest
+  post_build:
+    commands:
+    - echo Build completed on `date`
+    - echo pushing to platform repo
+    - docker push $PLATFORM_REPOSITORY_URI:latest
+    - docker push $PLATFORM_REPOSITORY_URI:$IMAGE_TAG
+    - echo Writing image definitions file...
+    - printf '[{"name":"%s","imageUri":"%s"}]' $REPO1_NAME $PLATFORM_REPOSITORY_URI:$IMAGE_TAG
+    - printf '[{"name":"%s","imageUri":"%s"}]' $REPO1_NAME $PLATFORM_REPOSITORY_URI:$IMAGE_TAG > imagedefinitions.json
+
+artifacts:
+  files:
+    - imagedefinitions.json

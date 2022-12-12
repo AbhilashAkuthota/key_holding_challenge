@@ -1,0 +1,30 @@
+version: "3.9"
+
+services:
+    platform:
+        tty: true
+        build:
+            context: .
+            args:
+                - CONFIG_PATH=configs/docker.cfg
+        restart: always
+        ports:
+            - "8000:8000"
+        depends_on:
+            - db
+        volumes:
+            - .:/code
+    db:
+        image: postgres
+        ports:
+            - "5432:5432"
+        environment:
+            - POSTGRES_DB=key_holding
+            - POSTGRES_USER=postgres
+            - POSTGRES_PASSWORD=postgres
+            - PGDATA=/var/lib/postgresql/data/pgdata
+        volumes:
+            - 'key_holding:/var/lib/postgresql/data/pgdata'
+
+volumes:
+  key_holding:
